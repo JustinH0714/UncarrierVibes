@@ -65,4 +65,5 @@ coverage.xml
 *.cover
 
 # Distribution
-.pytest_cache/
+.pytest_cache/.env
+reddit_sentiment.jsonl
