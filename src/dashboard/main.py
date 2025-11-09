@@ -124,6 +124,48 @@ with tab_overview:
     else:
         st.info("No reviews yet.")
 
+    # Emotion Pulse (last few minutes)
+    st.subheader("Emotion Pulse (last 5 minutes)")
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            pulse = client.get(f"{API_BASE}/api/v1/metrics/pulse", params={"window_minutes": 5}).json()
+        # Gauge indicator from -1 (red) to +1 (green)
+        val = float(pulse.get("average_sentiment", 0.0))
+        intensity = float(pulse.get("intensity", 0.0))
+        count = int(pulse.get("count", 0))
+        color = "#34c759" if val >= 0 else "#ff3b30"
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=val,
+            number={"suffix": " avg"},
+            delta={"reference": 0, "increasing": {"color": "#34c759"}, "decreasing": {"color": "#ff3b30"}},
+            title={"text": f"Pulse | intensity {intensity:.2f} | n={count}"},
+            gauge={
+                "axis": {"range": [-1, 1]},
+                "bar": {"color": color},
+                "steps": [
+                    {"range": [-1, -0.5], "color": "#ff9aa7"},
+                    {"range": [-0.5, 0], "color": "#ffd1d6"},
+                    {"range": [0, 0.5], "color": "#c7f7d4"},
+                    {"range": [0.5, 1], "color": "#9ae6b4"},
+                ]
+            }
+        ))
+        fig_gauge.update_layout(height=220, margin=dict(l=30, r=30, t=40, b=10))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Pulse unavailable: {e}")
+
+    # Live Insights
+    st.subheader("AI Insights (last 60 minutes)")
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
+        for line in insights.get("insights", [])[:3]:
+            st.markdown(f"- {line}")
+    except Exception as e:
+        st.warning(f"Insights unavailable: {e}")
+
     # Sentiment trend chart
     st.subheader("Sentiment Trend")
     if not st.session_state.data.empty:
@@ -387,4 +429,8 @@ if auto_refresh:
         st.session_state["_last_auto_refresh"] = now
     # Sleep and rerun to keep the loop going
     time.sleep(5)
-    st.experimental_rerun()
+    # Streamlit deprecation: prefer st.rerun when available
+    try:
+        st.rerun()
+    except Exception:
+        st.experimental_rerun()
