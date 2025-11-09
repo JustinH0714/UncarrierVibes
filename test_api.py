@@ -68,7 +68,7 @@ if __name__ == "__main__":
         test_submit_feedback()
         test_get_stats()
         test_metrics_summary()
-    test_pulse_and_insights()
+        test_pulse_and_insights()
         print("\n" + "=" * 50)
         print("✅ All tests completed successfully!")
         print(f"\n🌐 Visit http://localhost:8000/docs for API documentation")
