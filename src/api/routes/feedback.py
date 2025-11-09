@@ -23,7 +23,10 @@ async def submit_feedback(
     """
     analysis = sentiment_analyzer.analyze(text)
 
-    outage_keywords = ["outage", "power", "blackout", "no service", "network down", "cant connect", "cannot connect"]
+    # Include common misspelling 'outrage' (people may type 'power outrage')
+    outage_keywords = [
+        "outage", "outrage", "power", "blackout", "no service", "network down", "cant connect", "cannot connect"
+    ]
     lowered = text.lower()
     is_outage = any(k in lowered for k in outage_keywords)
 

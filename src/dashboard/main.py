@@ -38,6 +38,10 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     for col in ["sentiment_score", "confidence", "latitude", "longitude"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Coerce outage flag to boolean for proper checkbox rendering
+    if "is_outage" in df.columns:
+        if df["is_outage"].dtype != bool:
+            df["is_outage"] = df["is_outage"].fillna(False).astype(bool)
     # Keep expected columns if present (include id for de-dup and reference)
     cols = ["id", "timestamp", "sentiment_score", "sentiment", "confidence", "text", "location", "latitude", "longitude", "is_outage"]
     existing_cols = [c for c in cols if c in df.columns]
@@ -72,7 +76,7 @@ def fetch_latest_data(limit: int = 50):
 st.title("📊 UncarrierVibes Dashboard")
 
 # Tabs / Channels (removed separate Map tab; outage tab contains map)
-tab_overview, tab_all, tab_outages = st.tabs(["Overview", "All Reviews", "Outages"])
+tab_overview, tab_all, tab_outages, tab_submit = st.tabs(["Overview", "All Reviews", "Outages", "Submit Review"])
 
 # Controls
 with st.sidebar:
@@ -170,7 +174,22 @@ with tab_all:
         st.caption(f"Showing {len(page_df)} of {len(df_all)} filtered reviews (Page {page}/{total_pages})")
 
         show_all_cols = [c for c in ["timestamp", "text", "sentiment", "confidence", "location", "is_outage"] if c in page_df.columns]
-        st.dataframe(page_df[show_all_cols], use_container_width=True)
+        # Configure boolean column as checkbox and rename for clarity
+        column_config = {}
+        if "is_outage" in show_all_cols:
+            try:
+                column_config = {
+                    "is_outage": st.column_config.CheckboxColumn(
+                        label="Outage",
+                        help="Checked when text suggests an outage",
+                        default=False,
+                        disabled=True,
+                    )
+                }
+            except Exception:
+                column_config = {"is_outage": "Outage"}
+
+        st.dataframe(page_df[show_all_cols], use_container_width=True, column_config=column_config)
     else:
         st.info("No reviews available.")
 
@@ -306,6 +325,55 @@ with tab_outages:
     else:
         st.info("Press 'Refresh Outages' to load outage reports.")
 
+with tab_submit:
+    st.header("Submit Your Review")
+    st.markdown("Share your experience with T-Mobile service. Your feedback helps improve the network.")
+    
+    with st.form(key="review_form", clear_on_submit=True):
+        review_text = st.text_area(
+            "Your Review",
+            placeholder="Describe your experience (e.g., 'Great coverage in downtown Seattle' or 'Dropped calls near Phoenix airport')",
+            height=150,
+            help="Be specific! Mention location keywords if you want auto-detection."
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            user_city = st.text_input(
+                "City (Optional)",
+                placeholder="e.g., Seattle, Austin, Miami",
+                help="Leave blank to auto-detect from your review text."
+            )
+        with col2:
+            # Placeholder for future enhancements (manual coords, etc.)
+            st.empty()
+        
+        submit_button = st.form_submit_button("Submit Review", type="primary")
+        
+        if submit_button:
+            if not review_text or len(review_text.strip()) < 5:
+                st.error("Please write at least a few words in your review.")
+            else:
+                # Submit to API
+                url = f"{API_BASE}/api/v1/feedback/submit"
+                params = {"text": review_text.strip()}
+                if user_city and user_city.strip():
+                    # User provided city; backend will use it or auto-extract if missing coords
+                    params["location"] = user_city.strip()
+                
+                try:
+                    with httpx.Client(timeout=10.0) as client:
+                        resp = client.post(url, params=params)
+                        resp.raise_for_status()
+                        created = resp.json()
+                        st.success(f"✅ Review submitted! (ID: {created.get('id')})")
+                        st.balloons()
+                        # Refresh data to show new review
+                        fetch_latest_data(limit=fetch_limit)
+                except httpx.HTTPError as e:
+                    st.error(f"Failed to submit review: {e}")
+                except Exception as e:
+                    st.error(f"Unexpected error: {e}")
 
 # (Moved charts and recent table into tabs above)
 
