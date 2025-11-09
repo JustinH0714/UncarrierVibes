@@ -181,8 +181,8 @@ with tab_overview:
 
     # Keep Overview focused on core metrics & recent feedback only.
 with tab_pulse:
-    st.header("⚡ Emotion Pulse")
-    st.caption("Real-time sentiment intensity & direction over the last few minutes.")
+    st.header("Emotion Pulse")
+    st.caption("Real-time sentiment values (text only – visuals removed as requested).")
     # Fetch current pulse metric (no charts, just key metrics)
     try:
         with httpx.Client(timeout=10.0) as client:
@@ -191,22 +191,17 @@ with tab_pulse:
         intensity = float(pulse.get("intensity", 0.0))
         count = int(pulse.get("count", 0))
         pos_ratio = float(pulse.get("positive_ratio", 0.0))
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.metric("Avg Sentiment (5m)", f"{val:.2f}")
-        with c2:
-            st.metric("Intensity", f"{intensity:.2f}")
-        with c3:
-            st.metric("Samples", count)
-        with c4:
-            st.metric("Positive Ratio", f"{pos_ratio:.2f}")
+        st.write(f"Avg Sentiment (5m): {val:.2f}")
+        st.write(f"Intensity: {intensity:.2f}")
+        st.write(f"Samples: {count}")
+        st.write(f"Positive Ratio: {pos_ratio:.2f}")
     except Exception as e:
         st.warning(f"Pulse unavailable: {e}")
     st.caption("Tip: Enable auto-refresh in the sidebar to keep these numbers live.")
 
 with tab_insights:
-    st.header("🧠 Live Insights")
-    st.caption("Automatic summaries of emerging themes, hotspots, and positive buzz.")
+    st.header("Live Insights")
+    st.caption("Automatic summaries (text only – visuals removed as requested).")
     try:
         with httpx.Client(timeout=15.0) as client:
             insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
