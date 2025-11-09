@@ -75,8 +75,10 @@ def fetch_latest_data(limit: int = 50):
 # Main dashboard layout
 st.title("📊 UncarrierVibes Dashboard")
 
-# Tabs / Channels (removed separate Map tab; outage tab contains map)
-tab_overview, tab_all, tab_outages, tab_submit = st.tabs(["Overview", "All Reviews", "Outages", "Submit Review"])
+# Tabs / Channels (separate Pulse & Insights for cleaner layout)
+tab_overview, tab_pulse, tab_insights, tab_all, tab_outages, tab_submit = st.tabs([
+    "Overview", "Pulse", "Insights", "All Reviews", "Outages", "Submit Review"
+])
 
 # Controls
 with st.sidebar:
@@ -124,22 +126,38 @@ with tab_overview:
     else:
         st.info("No reviews yet.")
 
-    # Emotion Pulse (last few minutes)
-    st.subheader("Emotion Pulse (last 5 minutes)")
+    # Keep Overview focused on core metrics & recent feedback only.
+with tab_pulse:
+    st.header("⚡ Emotion Pulse")
+    st.caption("Real-time sentiment intensity & direction over the last few minutes.")
+    if "pulse_history" not in st.session_state:
+        st.session_state.pulse_history = []  # list of dicts {ts, avg, intensity, count}
+
+    # Fetch current pulse metric
     try:
         with httpx.Client(timeout=10.0) as client:
             pulse = client.get(f"{API_BASE}/api/v1/metrics/pulse", params={"window_minutes": 5}).json()
-        # Gauge indicator from -1 (red) to +1 (green)
         val = float(pulse.get("average_sentiment", 0.0))
         intensity = float(pulse.get("intensity", 0.0))
         count = int(pulse.get("count", 0))
+        # Append to history (max 120 samples)
+        st.session_state.pulse_history.append({
+            "timestamp": datetime.utcnow(),
+            "average_sentiment": val,
+            "intensity": intensity,
+            "count": count
+        })
+        if len(st.session_state.pulse_history) > 120:
+            st.session_state.pulse_history = st.session_state.pulse_history[-120:]
+
+        # Gauge visualization
         color = "#34c759" if val >= 0 else "#ff3b30"
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=val,
             number={"suffix": " avg"},
-            delta={"reference": 0, "increasing": {"color": "#34c759"}, "decreasing": {"color": "#ff3b30"}},
-            title={"text": f"Pulse | intensity {intensity:.2f} | n={count}"},
+            delta={"reference": 0},
+            title={"text": f"Avg Sentiment (5m) | intensity {intensity:.2f} | n={count}"},
             gauge={
                 "axis": {"range": [-1, 1]},
                 "bar": {"color": color},
@@ -153,18 +171,59 @@ with tab_overview:
         ))
         fig_gauge.update_layout(height=220, margin=dict(l=30, r=30, t=40, b=10))
         st.plotly_chart(fig_gauge, use_container_width=True)
+
+        # Waveform / line chart using history
+        hist_df = pd.DataFrame(st.session_state.pulse_history)
+        if not hist_df.empty:
+            hist_df = hist_df.sort_values("timestamp")
+            pulse_line = go.Figure()
+            pulse_line.add_trace(go.Scatter(
+                x=hist_df["timestamp"], y=hist_df["average_sentiment"],
+                mode="lines+markers", name="Avg Sentiment", line=dict(color="#34c759")
+            ))
+            pulse_line.add_trace(go.Scatter(
+                x=hist_df["timestamp"], y=hist_df["intensity"],
+                mode="lines", name="Intensity", line=dict(color="#ff9500", dash="dot")
+            ))
+            pulse_line.update_layout(
+                title="Pulse History (Session)",
+                yaxis_title="Value",
+                height=300,
+                legend=dict(orientation="h", y=1.02, x=0)
+            )
+            st.plotly_chart(pulse_line, use_container_width=True)
+        else:
+            st.info("No pulse history yet.")
     except Exception as e:
         st.warning(f"Pulse unavailable: {e}")
 
-    # Live Insights
-    st.subheader("AI Insights (last 60 minutes)")
+    st.caption("Tip: Enable auto-refresh in the sidebar to animate the pulse line.")
+
+with tab_insights:
+    st.header("🧠 Live Insights")
+    st.caption("Automatic summaries of emerging themes, hotspots, and positive buzz.")
     try:
         with httpx.Client(timeout=15.0) as client:
             insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
-        for line in insights.get("insights", [])[:3]:
+        for line in insights.get("insights", [])[:5]:
             st.markdown(f"- {line}")
+        # Ancillary breakdowns
+        pos_kw = insights.get("positive_keywords", [])
+        neg_kw = insights.get("negative_keywords", [])
+        top_locs = insights.get("negative_locations", [])
+        col_i1, col_i2, col_i3 = st.columns(3)
+        with col_i1:
+            st.subheader("Negative Keywords")
+            st.write(", ".join(neg_kw) if neg_kw else "—")
+        with col_i2:
+            st.subheader("Positive Keywords")
+            st.write(", ".join(pos_kw) if pos_kw else "—")
+        with col_i3:
+            st.subheader("Hotspot Locations")
+            st.write(", ".join(top_locs) if top_locs else "—")
     except Exception as e:
         st.warning(f"Insights unavailable: {e}")
+
 
     # Sentiment trend chart
     st.subheader("Sentiment Trend")
@@ -429,7 +488,6 @@ if auto_refresh:
         st.session_state["_last_auto_refresh"] = now
     # Sleep and rerun to keep the loop going
     time.sleep(5)
-    # Streamlit deprecation: prefer st.rerun when available
     try:
         st.rerun()
     except Exception:
