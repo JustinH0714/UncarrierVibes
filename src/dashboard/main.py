@@ -18,6 +18,22 @@ st.set_page_config(
     layout="wide"
 )
 
+# Global CSS for professional styling
+st.markdown(
+    """
+    <style>
+    .hero {background: linear-gradient(90deg, rgba(226,0,116,0.12), rgba(226,0,116,0.02)); border: 1px solid rgba(226,0,116,0.25); padding: 16px 20px; border-radius: 16px;}
+    .hero h1 {margin: 0; font-size: 1.4rem;}
+    .tagline {margin: 2px 0 0 0; opacity: 0.85;}
+    .stTabs [role="tablist"] button[role="tab"] { padding: 10px 14px; border-radius: 10px; margin-right: 6px; }
+    .stTabs [role="tablist"] button[aria-selected="true"] { background: rgba(226,0,116,0.16); color: #E20074; }
+    div[data-testid="stMetric"] { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 12px; }
+    .block-container { padding-top: 1rem; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Initialize session state
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame(columns=[
@@ -60,7 +76,10 @@ def fetch_latest_data(limit: int = 50):
                 # Normalize and reduce to expected columns
                 new_df = _normalize_dataframe(new_df)
                 # Merge, de-duplicate by optional 'id' if present
-                combined = pd.concat([st.session_state.data, new_df], ignore_index=True)
+                if st.session_state.data.empty:
+                    combined = new_df.copy()
+                else:
+                    combined = pd.concat([st.session_state.data, new_df], ignore_index=True)
                 if "id" in new_df.columns:
                     combined = combined.drop_duplicates(subset=["id"], keep="last")
                 # Sort by timestamp if available
@@ -73,7 +92,17 @@ def fetch_latest_data(limit: int = 50):
         st.error(f"Unexpected error fetching data: {str(e)}")
 
 # Main dashboard layout
-st.title("📊 UncarrierVibes Dashboard")
+st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-content">
+                <h1>UncarrierVibes Intelligence</h1>
+                <p class="tagline">Real-time sentiment pulse, outage awareness, and customer insight for the T‑Mobile experience.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+)
 
 # Tabs / Channels (separate Pulse & Insights for cleaner layout)
 tab_overview, tab_pulse, tab_insights, tab_all, tab_outages, tab_submit = st.tabs([
@@ -85,9 +114,11 @@ with st.sidebar:
     st.markdown("### Data Controls")
     auto_refresh = st.checkbox("Auto-refresh every 5s", value=False)
     fetch_limit = st.slider("Fetch limit", min_value=10, max_value=200, value=50, step=10)
-    if st.button("Refresh now"):
+    if st.button("Refresh now", use_container_width=True):
         fetch_latest_data(limit=fetch_limit)
         st.success("Data refreshed.")
+    st.markdown("---")
+    st.caption("Brand theme applied. Auto-refresh will also update Pulse and Insights tabs.")
 
 # Initial fetch on first load if no data
 if st.session_state.data.empty:
@@ -103,13 +134,13 @@ with tab_overview:
     avg_sentiment = st.session_state.data["sentiment_score"].mean() if total_feedback else 0.0
 
     with colA:
-        st.metric("Total Reviews", total_feedback)
+    st.metric("Total Reviews", total_feedback)
     with colB:
-        st.metric("Positive %", f"{positive_percent:.1f}%")
+    st.metric("Positive %", f"{positive_percent:.1f}%")
     with colC:
-        st.metric("Negative %", f"{negative_percent:.1f}%")
+    st.metric("Negative %", f"{negative_percent:.1f}%")
     with colD:
-        st.metric("Avg Sentiment Score", f"{avg_sentiment:.2f}")
+    st.metric("Avg Sentiment Score", f"{avg_sentiment:.2f}")
 
     # Donut chart for positive vs negative distribution
     st.subheader("Sentiment Distribution")
@@ -122,7 +153,7 @@ with tab_overview:
             color_discrete_map={"Positive": "#34c759", "Negative": "#ff3b30"},
         )
         dist_fig.update_layout(showlegend=True)
-        st.plotly_chart(dist_fig, use_container_width=True)
+    st.plotly_chart(dist_fig, use_container_width=True)
     else:
         st.info("No reviews yet.")
 
@@ -232,8 +263,9 @@ with tab_insights:
             st.session_state.data,
             x="timestamp",
             y="sentiment_score",
-            title="Customer Sentiment Over Time"
+            title="Customer Sentiment Over Time",
         )
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
     # Recent feedback table (channel snippet)
@@ -248,7 +280,7 @@ with tab_insights:
 
 with tab_all:
     st.header("All Reviews Channel")
-    if st.button("Reload All Reviews"):
+    if st.button("Reload All Reviews", use_container_width=True):
         # Attempt to fetch a larger batch while keeping de-dup logic
         fetch_latest_data(limit=200)
         st.success("Reloaded reviews.")
@@ -290,7 +322,7 @@ with tab_all:
             except Exception:
                 column_config = {"is_outage": "Outage"}
 
-        st.dataframe(page_df[show_all_cols], use_container_width=True, column_config=column_config)
+    st.dataframe(page_df[show_all_cols], use_container_width=True, column_config=column_config)
     else:
         st.info("No reviews available.")
 
@@ -298,7 +330,7 @@ with tab_outages:
     st.header("Outage Reports & Map")
     
     # Fetch outage-specific data directly (independent of latest cache) if requested
-    if st.button("Refresh Outages"):
+    if st.button("Refresh Outages", use_container_width=True):
         try:
             with httpx.Client(timeout=10.0) as client:
                 resp = client.get(f"{API_BASE}/api/v1/feedback/outages", params={"limit": 200})
@@ -417,12 +449,12 @@ with tab_outages:
                     tooltip=tooltip,
                     map_style="mapbox://styles/mapbox/dark-v10"
                 )
-                st.pydeck_chart(deck, use_container_width=True)
+            st.pydeck_chart(deck, use_container_width=True)
         
         # Outage table
         st.subheader("Outage Details")
         show_out_cols = [c for c in ["timestamp", "text", "location", "sentiment", "confidence", "distance_km"] if c in filtered_outages.columns]
-        st.dataframe(filtered_outages[show_out_cols].head(50), use_container_width=True)
+    st.dataframe(filtered_outages[show_out_cols].head(50), use_container_width=True)
     else:
         st.info("Press 'Refresh Outages' to load outage reports.")
 
@@ -449,7 +481,7 @@ with tab_submit:
             # Placeholder for future enhancements (manual coords, etc.)
             st.empty()
         
-        submit_button = st.form_submit_button("Submit Review", type="primary")
+    submit_button = st.form_submit_button("Submit Review", type="primary")
         
         if submit_button:
             if not review_text or len(review_text.strip()) < 5:
