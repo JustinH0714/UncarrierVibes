@@ -254,10 +254,10 @@ with tab_pulse:
 
 with tab_insights:
     st.header("Live Insights")
-    st.caption("Automatic summaries of emerging themes, hotspots, and positive buzz.")
+    st.caption("Automatic summaries of emerging themes, hotspots, and positive buzz from the 50 most recent reviews.")
     try:
         with httpx.Client(timeout=15.0) as client:
-            insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
+            insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"limit": 50}).json()
         for line in insights.get("insights", [])[:5]:
             st.markdown(f"- {line}")
         # Ancillary breakdowns
