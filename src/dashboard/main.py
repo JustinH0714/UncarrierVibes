@@ -183,74 +183,26 @@ with tab_overview:
 with tab_pulse:
     st.header("⚡ Emotion Pulse")
     st.caption("Real-time sentiment intensity & direction over the last few minutes.")
-    if "pulse_history" not in st.session_state:
-        st.session_state.pulse_history = []  # list of dicts {ts, avg, intensity, count}
-
-    # Fetch current pulse metric
+    # Fetch current pulse metric (no charts, just key metrics)
     try:
         with httpx.Client(timeout=10.0) as client:
             pulse = client.get(f"{API_BASE}/api/v1/metrics/pulse", params={"window_minutes": 5}).json()
         val = float(pulse.get("average_sentiment", 0.0))
         intensity = float(pulse.get("intensity", 0.0))
         count = int(pulse.get("count", 0))
-        # Append to history (max 120 samples)
-        st.session_state.pulse_history.append({
-            "timestamp": datetime.utcnow(),
-            "average_sentiment": val,
-            "intensity": intensity,
-            "count": count
-        })
-        if len(st.session_state.pulse_history) > 120:
-            st.session_state.pulse_history = st.session_state.pulse_history[-120:]
-
-        # Gauge visualization
-        color = "#34c759" if val >= 0 else "#ff3b30"
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=val,
-            number={"suffix": " avg"},
-            delta={"reference": 0},
-            title={"text": f"Avg Sentiment (5m) | intensity {intensity:.2f} | n={count}"},
-            gauge={
-                "axis": {"range": [-1, 1]},
-                "bar": {"color": color},
-                "steps": [
-                    {"range": [-1, -0.5], "color": "#ff9aa7"},
-                    {"range": [-0.5, 0], "color": "#ffd1d6"},
-                    {"range": [0, 0.5], "color": "#c7f7d4"},
-                    {"range": [0.5, 1], "color": "#9ae6b4"},
-                ]
-            }
-        ))
-        fig_gauge.update_layout(height=220, margin=dict(l=30, r=30, t=40, b=10))
-        st.plotly_chart(fig_gauge, use_container_width=True)
-
-        # Waveform / line chart using history
-        hist_df = pd.DataFrame(st.session_state.pulse_history)
-        if not hist_df.empty:
-            hist_df = hist_df.sort_values("timestamp")
-            pulse_line = go.Figure()
-            pulse_line.add_trace(go.Scatter(
-                x=hist_df["timestamp"], y=hist_df["average_sentiment"],
-                mode="lines+markers", name="Avg Sentiment", line=dict(color="#34c759")
-            ))
-            pulse_line.add_trace(go.Scatter(
-                x=hist_df["timestamp"], y=hist_df["intensity"],
-                mode="lines", name="Intensity", line=dict(color="#ff9500", dash="dot")
-            ))
-            pulse_line.update_layout(
-                title="Pulse History (Session)",
-                yaxis_title="Value",
-                height=300,
-                legend=dict(orientation="h", y=1.02, x=0)
-            )
-            st.plotly_chart(pulse_line, use_container_width=True)
-        else:
-            st.info("No pulse history yet.")
+        pos_ratio = float(pulse.get("positive_ratio", 0.0))
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("Avg Sentiment (5m)", f"{val:.2f}")
+        with c2:
+            st.metric("Intensity", f"{intensity:.2f}")
+        with c3:
+            st.metric("Samples", count)
+        with c4:
+            st.metric("Positive Ratio", f"{pos_ratio:.2f}")
     except Exception as e:
         st.warning(f"Pulse unavailable: {e}")
-
-    st.caption("Tip: Enable auto-refresh in the sidebar to animate the pulse line.")
+    st.caption("Tip: Enable auto-refresh in the sidebar to keep these numbers live.")
 
 with tab_insights:
     st.header("🧠 Live Insights")
@@ -260,20 +212,6 @@ with tab_insights:
             insights = client.get(f"{API_BASE}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
         for line in insights.get("insights", [])[:5]:
             st.markdown(f"- {line}")
-        # Ancillary breakdowns
-        pos_kw = insights.get("positive_keywords", [])
-        neg_kw = insights.get("negative_keywords", [])
-        top_locs = insights.get("negative_locations", [])
-        col_i1, col_i2, col_i3 = st.columns(3)
-        with col_i1:
-            st.subheader("Negative Keywords")
-            st.write(", ".join(neg_kw) if neg_kw else "—")
-        with col_i2:
-            st.subheader("Positive Keywords")
-            st.write(", ".join(pos_kw) if pos_kw else "—")
-        with col_i3:
-            st.subheader("Hotspot Locations")
-            st.write(", ".join(top_locs) if top_locs else "—")
     except Exception as e:
         st.warning(f"Insights unavailable: {e}")
 
