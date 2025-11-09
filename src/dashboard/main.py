@@ -134,13 +134,13 @@ with tab_overview:
     avg_sentiment = st.session_state.data["sentiment_score"].mean() if total_feedback else 0.0
 
     with colA:
-    st.metric("Total Reviews", total_feedback)
+        st.metric("Total Reviews", total_feedback)
     with colB:
-    st.metric("Positive %", f"{positive_percent:.1f}%")
+        st.metric("Positive %", f"{positive_percent:.1f}%")
     with colC:
-    st.metric("Negative %", f"{negative_percent:.1f}%")
+        st.metric("Negative %", f"{negative_percent:.1f}%")
     with colD:
-    st.metric("Avg Sentiment Score", f"{avg_sentiment:.2f}")
+        st.metric("Avg Sentiment Score", f"{avg_sentiment:.2f}")
 
     # Donut chart for positive vs negative distribution
     st.subheader("Sentiment Distribution")
@@ -153,9 +153,31 @@ with tab_overview:
             color_discrete_map={"Positive": "#34c759", "Negative": "#ff3b30"},
         )
         dist_fig.update_layout(showlegend=True)
-    st.plotly_chart(dist_fig, use_container_width=True)
+        st.plotly_chart(dist_fig, use_container_width=True)
     else:
         st.info("No reviews yet.")
+
+    # Sentiment trend chart
+    st.subheader("Sentiment Trend")
+    if not st.session_state.data.empty:
+        fig = px.line(
+            st.session_state.data,
+            x="timestamp",
+            y="sentiment_score",
+            title="Customer Sentiment Over Time",
+        )
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10))
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Recent feedback table (channel snippet)
+    st.subheader("Recent Feedback")
+    if not st.session_state.data.empty:
+        recent_data = st.session_state.data.tail(15).sort_values("timestamp", ascending=False)
+        show_cols = [c for c in ["timestamp", "text", "sentiment", "confidence", "location"] if c in recent_data.columns]
+        st.dataframe(
+            recent_data[show_cols],
+            use_container_width=True
+        )
 
     # Keep Overview focused on core metrics & recent feedback only.
 with tab_pulse:
@@ -255,29 +277,6 @@ with tab_insights:
     except Exception as e:
         st.warning(f"Insights unavailable: {e}")
 
-
-    # Sentiment trend chart
-    st.subheader("Sentiment Trend")
-    if not st.session_state.data.empty:
-        fig = px.line(
-            st.session_state.data,
-            x="timestamp",
-            y="sentiment_score",
-            title="Customer Sentiment Over Time",
-        )
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10))
-        st.plotly_chart(fig, use_container_width=True)
-
-    # Recent feedback table (channel snippet)
-    st.subheader("Recent Feedback")
-    if not st.session_state.data.empty:
-        recent_data = st.session_state.data.tail(15).sort_values("timestamp", ascending=False)
-        show_cols = [c for c in ["timestamp", "text", "sentiment", "confidence", "location"] if c in recent_data.columns]
-        st.dataframe(
-            recent_data[show_cols],
-            use_container_width=True
-        )
-
 with tab_all:
     st.header("All Reviews Channel")
     if st.button("Reload All Reviews", use_container_width=True):
@@ -322,7 +321,7 @@ with tab_all:
             except Exception:
                 column_config = {"is_outage": "Outage"}
 
-    st.dataframe(page_df[show_all_cols], use_container_width=True, column_config=column_config)
+        st.dataframe(page_df[show_all_cols], use_container_width=True, column_config=column_config)
     else:
         st.info("No reviews available.")
 
@@ -449,12 +448,12 @@ with tab_outages:
                     tooltip=tooltip,
                     map_style="mapbox://styles/mapbox/dark-v10"
                 )
-            st.pydeck_chart(deck, use_container_width=True)
+                st.pydeck_chart(deck, use_container_width=True)
         
         # Outage table
         st.subheader("Outage Details")
         show_out_cols = [c for c in ["timestamp", "text", "location", "sentiment", "confidence", "distance_km"] if c in filtered_outages.columns]
-    st.dataframe(filtered_outages[show_out_cols].head(50), use_container_width=True)
+        st.dataframe(filtered_outages[show_out_cols].head(50), use_container_width=True)
     else:
         st.info("Press 'Refresh Outages' to load outage reports.")
 
@@ -481,7 +480,7 @@ with tab_submit:
             # Placeholder for future enhancements (manual coords, etc.)
             st.empty()
         
-    submit_button = st.form_submit_button("Submit Review", type="primary")
+        submit_button = st.form_submit_button("Submit Review", type="primary")
         
         if submit_button:
             if not review_text or len(review_text.strip()) < 5:
@@ -493,7 +492,7 @@ with tab_submit:
                 if user_city and user_city.strip():
                     # User provided city; backend will use it or auto-extract if missing coords
                     params["location"] = user_city.strip()
-                
+
                 try:
                     with httpx.Client(timeout=10.0) as client:
                         resp = client.post(url, params=params)
