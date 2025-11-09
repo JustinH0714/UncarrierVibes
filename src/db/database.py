@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -25,6 +25,11 @@ class Feedback(Base):
     confidence = Column(Float, nullable=False)
     sentiment_score = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    # New optional columns for location and outage classification
+    location = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    is_outage = Column(Boolean, default=False)
 
 # Create tables
 Base.metadata.create_all(bind=engine)

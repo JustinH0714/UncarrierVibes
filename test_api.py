@@ -50,6 +50,15 @@ def test_metrics_summary():
     print(f"  • Average sentiment: {metrics['average_sentiment']:.2f}")
     print(f"  • Positive percentage: {metrics['positive_percentage']:.1f}%")
 
+def test_pulse_and_insights():
+    """Test new pulse and insights endpoints"""
+    pulse = requests.get(f"{BASE_URL}/api/v1/metrics/pulse", params={"window_minutes": 5}).json()
+    print(f"\n⚡ Emotion Pulse (5m): avg={pulse.get('average_sentiment'):.2f} intensity={pulse.get('intensity'):.2f} n={pulse.get('count')}")
+    insights = requests.get(f"{BASE_URL}/api/v1/metrics/insights", params={"lookback_minutes": 60}).json()
+    print("\n🧠 AI Insights (60m):")
+    for line in insights.get("insights", [])[:3]:
+        print(f"  • {line}")
+
 if __name__ == "__main__":
     print("🚀 Testing UncarrierVibes API\n")
     print("=" * 50)
@@ -59,6 +68,7 @@ if __name__ == "__main__":
         test_submit_feedback()
         test_get_stats()
         test_metrics_summary()
+        test_pulse_and_insights()
         print("\n" + "=" * 50)
         print("✅ All tests completed successfully!")
         print(f"\n🌐 Visit http://localhost:8000/docs for API documentation")
